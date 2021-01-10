@@ -9,3 +9,10 @@ zone_id = ""
 kv_namespaces = [
     { binding = "ATTENDSYS", preview_id = "b6db4cf577d54d9b81fced96045d48df" }
 ]
+
+[env.dev]
+name = "attend-dev"
+vars = { DEBUG = "true" }
+kv_namespaces = [
+    { binding = "ATTENDSYS", preview_id = "b6db4cf577d54d9b81fced96045d48df" }
+]

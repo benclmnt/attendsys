@@ -5,9 +5,9 @@
   "description": "QR attendance system",
   "main": "index.js",
   "scripts": {
-    "start": "NODE_ENV=development wrangler dev",
-    "publish": "NODE_ENV=production yarn prep && wrangler publish",
-    "preview": "NODE_ENV=production yarn prep && wrangler preview --watch",
+    "start": "wrangler dev --env dev",
+    "publish": "wrangler publish",
+    "preview": "wrangler preview --watch",
     "test": "echo \"Error: no test specified\" && exit 1",
     "fmt": "prettier --write '**/*.{js,css,json,md}'"
   },

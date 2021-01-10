@@ -1,7 +1,85 @@
-const DEBUG = process.env.NODE_ENV !== 'production'
+// DEBUG is an environment variable
+
+async function updateAttendance(request) {
+  try {
+    const url = new URL(request.url);
+    const formData = await request.formData()
+    const nusnet = escapeHtml(formData.get('nusnet'))
+    const name = escapeHtml(formData.get('name'))
+    const now = new Date()
+    const currDate = now.toLocaleDateString('en-GB', {
+      timeZone: 'Asia/Singapore',
+    }) // "dd/mm/yyyy",
+    const currTime = now.toLocaleTimeString('en-GB', {
+      timeZone: 'Asia/Singapore',
+    }) // "hh:mm:ss"
+
+    if (!DEBUG) {
+      if (!isValidTimeRange(now) || !isValidDay(now)) {
+        throw new Error('Sorry, currently this service is unavailable')
+      }
+    }
+
+    let data = await getCache(nusnet)
+    if (!data) {
+      data = {
+        name: [name],
+        attendance: [],
+      }
+    } else {
+      data = JSON.parse(data)
+    }
+
+    if (!data.attendance.find(x => x.date == currDate)) {
+      data.attendance.push({
+        date: currDate,
+        time: currTime,
+      })
+      if (DEBUG) {
+        console.log(JSON.stringify(data.attendance))
+      }
+    }
+
+    await setCache(nusnet, JSON.stringify(data))
+
+    // Redirect to /?name=${name}
+    url.searchParams.append('name', name)
+    return new Response(null, {
+      status: 302,
+      headers: { location: url.href },
+    })
+  } catch (err) {
+    return new Response(err, { status: 500 })
+  }
+}
+
+async function listAttendance(request) {}
+
+/**
+ * Respond with hello worker text
+ * @param {Request} request
+ */
+async function handleRequest(request) {
+  if (request.method === 'POST') {
+    return updateAttendance(request)
+  }
+
+  const url = new URL(request.url)
+  return new Response(form(url.searchParams.get('name')), {
+    headers: { 'content-type': 'text/html' },
+  })
+}
+
+addEventListener('fetch', event => {
+  event.respondWith(handleRequest(event.request))
+})
+
+/**
+ * HELPER functions
+ */
 
 const escapeHtml = str => str.replace(/</g, '\\u003c')
-const template = body => `
+const template = (body, script = '') => `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -19,11 +97,20 @@ const template = body => `
 <body>
   ${body}
 </body>
+${script}
 </html>
 `
 const form = name => {
   return name
-    ? template(`Thankyou ${escapeHtml(name)} for attending!`)
+    ? template(`Thankyou ${escapeHtml(name)} for attending!`,
+`
+<script>
+history.pushState(null, null, "s");
+window.addEventListener('popstate', function () {
+    history.pushState(null, null, "s");
+});
+</script>
+`)
     : template(`
 <h1>Angklung Check-In</h1>
 <form method="post">
@@ -52,75 +139,3 @@ const isValidDay = datetime => {
   const day = datetime.getDay()
   return day == 1 || day == 3
 }
-
-async function updateAttendance(request) {
-  let formData = await request.formData()
-  try {
-    const nusnet = escapeHtml(formData.get('nusnet'))
-    const name = escapeHtml(formData.get('name'))
-    const now = new Date()
-    const currDate = now.toLocaleDateString('en-GB', {
-      timeZone: 'Asia/Singapore',
-    }) // "dd/mm/yyyy",
-    const currTime = now.toLocaleTimeString('en-GB', {
-      timeZone: 'Asia/Singapore',
-    }) // "hh:mm:ss"
-
-    if (DEBUG) {
-      if (!isValidTimeRange(now) || !isValidDay(now)) {
-        throw new Error('Sorry, currently this service is unavailable')
-      }
-    }
-
-    let data = await getCache(nusnet)
-    if (!data) {
-      data = {
-        name: [name],
-        attendance: [],
-      }
-    } else {
-      data = JSON.parse(data)
-    }
-
-    if (!data.attendance.find(x => x.date == currDate)) {
-      data.attendance.push({
-        date: currDate,
-        time: currTime,
-      })
-    }
-
-    if (DEBUG) {
-      console.log(JSON.stringify(data.attendance))
-    }
-
-    await setCache(nusnet, JSON.stringify(data))
-    // https://en.wikipedia.org/wiki/Post/Redirect/Get
-    return new Response(null, {
-      status: 302,
-      headers: { location: `http://localhost:8787/?name=${name}` },
-    })
-  } catch (err) {
-    return new Response(err, { status: 500 })
-  }
-}
-
-async function listAttendance(request) {}
-
-/**
- * Respond with hello worker text
- * @param {Request} request
- */
-async function handleRequest(request) {
-  if (request.method === 'POST') {
-    return updateAttendance(request)
-  }
-
-  const url = new URL(request.url)
-  return new Response(form(url.searchParams.get('name')), {
-    headers: { 'content-type': 'text/html' },
-  })
-}
-
-addEventListener('fetch', event => {
-  event.respondWith(handleRequest(event.request))
-})
