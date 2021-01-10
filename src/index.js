@@ -1,10 +1,11 @@
+import qrcode from 'qr.js';
 // DEBUG is an environment variable
 
 async function updateAttendance(request) {
   try {
     const url = new URL(request.url);
     const formData = await request.formData()
-    const nusnet = escapeHtml(formData.get('nusnet'))
+    const nusnet = escapeHtml(formData.get('nusnet').toUpperCase())
     const name = escapeHtml(formData.get('name'))
     const now = new Date()
     const currDate = now.toLocaleDateString('en-GB', {
@@ -30,17 +31,17 @@ async function updateAttendance(request) {
       data = JSON.parse(data)
     }
 
+    // can only checkin once per day.
     if (!data.attendance.find(x => x.date == currDate)) {
       data.attendance.push({
         date: currDate,
         time: currTime,
       })
+      await setCache(nusnet, JSON.stringify(data))
       if (DEBUG) {
         console.log(JSON.stringify(data.attendance))
       }
     }
-
-    await setCache(nusnet, JSON.stringify(data))
 
     // Redirect to /?name=${name}
     url.searchParams.append('name', name)
@@ -55,6 +56,13 @@ async function updateAttendance(request) {
 
 async function listAttendance(request) {}
 
+async function generateQRCode(request) {
+    const url = new URL(request.url)
+    const cells = qrcode(url.href).modules;
+    return new Response(qrTemplate(cells), {
+    headers: { 'content-type': 'text/html' },
+  });
+}
 /**
  * Respond with hello worker text
  * @param {Request} request
@@ -65,7 +73,12 @@ async function handleRequest(request) {
   }
 
   const url = new URL(request.url)
-  return new Response(form(url.searchParams.get('name')), {
+
+  if (url.pathname.includes("/qr")) {
+    return generateQRCode(request);
+  }
+
+  return new Response(formTemplate(url.searchParams.get('name')), {
     headers: { 'content-type': 'text/html' },
   })
 }
@@ -75,7 +88,7 @@ addEventListener('fetch', event => {
 })
 
 /**
- * HELPER functions
+ * Template functions
  */
 
 const escapeHtml = str => str.replace(/</g, '\\u003c')
@@ -100,7 +113,7 @@ const template = (body, script = '') => `
 ${script}
 </html>
 `
-const form = name => {
+const formTemplate = name => {
   return name
     ? template(`Thankyou ${escapeHtml(name)} for attending!`,
 `
@@ -123,8 +136,48 @@ window.addEventListener('popstate', function () {
 `)
 }
 
+const qrTemplate = cells => template(
+  "",
+  `
+<script>
+const width = 200;
+const height = 200;
+
+const canvas = document.createElement('canvas');
+canvas.width = width;
+canvas.height = height;
+
+const ctx = canvas.getContext('2d');
+
+const cells = ${JSON.stringify(cells)};
+
+const tileW = width  / cells.length;
+const tileH = height / cells.length;
+
+for (let r = 0; r < cells.length ; ++r) {
+    const row = cells[r];
+    for (let c = 0; c < row.length ; ++c) {
+        ctx.fillStyle = row[c] ? '#000' : '#fff';
+        const w = (Math.ceil((c+1)*tileW) - Math.floor(c*tileW));
+        const h = (Math.ceil((r+1)*tileH) - Math.floor(r*tileH));
+        ctx.fillRect(Math.round(c*tileW), Math.round(r*tileH), w, h);
+    }
+}
+document.querySelector("body").appendChild(canvas);
+</script>
+  `
+)
+
+/**
+ * KV functions
+ */
+
 const setCache = (key, value) => ATTENDSYS.put(key, value)
 const getCache = key => ATTENDSYS.get(key)
+
+/**
+ * Util functions
+ */
 
 const isValidTimeRange = datetime => {
   const hr = datetime.getHours()
