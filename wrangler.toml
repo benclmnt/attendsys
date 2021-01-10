@@ -1,0 +1,10 @@
+name = "attend"
+type = "javascript"
+account_id = "85fad368ff87a470ab16c64b0197fce6"
+workers_dev = true
+route = ""
+zone_id = ""
+
+kv_namespaces = [
+    { binding = "ATTENDSYS", preview_id = "b6db4cf577d54d9b81fced96045d48df" }
+]
