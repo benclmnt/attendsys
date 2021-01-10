@@ -2,15 +2,19 @@
   "private": true,
   "name": "attend",
   "version": "1.0.0",
-  "description": "A template for kick starting a Cloudflare Workers project",
+  "description": "QR attendance system",
   "main": "index.js",
   "scripts": {
+    "start": "NODE_ENV=development wrangler dev",
+    "publish": "NODE_ENV=production yarn prep && wrangler publish",
+    "preview": "NODE_ENV=production yarn prep && wrangler preview --watch",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "format": "prettier --write '**/*.{js,css,json,md}'"
+    "fmt": "prettier --write '**/*.{js,css,json,md}'"
   },
-  "author": "Bennett Clement <benclmnt.dev@gmail.com>",
+  "author": "Bennett Clement <ben@benclmnt.com>",
   "license": "MIT",
   "devDependencies": {
+    "eslint": "^7.17.0",
     "prettier": "^1.18.2"
   }
 }

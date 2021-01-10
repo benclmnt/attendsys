@@ -1,7 +1,8 @@
 name = "attend"
-type = "javascript"
+type = "webpack"
 account_id = "85fad368ff87a470ab16c64b0197fce6"
 workers_dev = true
+webpack_config = "webpack.config.js"
 route = ""
 zone_id = ""
 
