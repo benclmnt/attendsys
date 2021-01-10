@@ -2,82 +2,87 @@ import qrcode from 'qr.js'
 // DEBUG is an environment variable
 
 async function updateAttendance(request) {
-  const url = new URL(request.url)
-  const formData = await request.formData()
-  const nusnet = escapeHtml(formData.get('nusnet').toUpperCase())
-  const name = escapeHtml(formData.get('name'))
-  const now = new Date()
-  const currDate = now.toLocaleDateString('en-GB', {
-    timeZone: 'Asia/Singapore',
-  }) // "dd/mm/yyyy",
-  const currTime = now.toLocaleTimeString('en-GB', {
-    timeZone: 'Asia/Singapore',
-  }) // "hh:mm:ss"
+  try {
+    const url = new URL(request.url)
+    const formData = await request.formData()
+    const nusnet = escapeHtml(formData.get('nusnet').toUpperCase())
+    const name = escapeHtml(formData.get('name'))
+    const now = new Date()
+    const currDate = now.toLocaleDateString('en-GB', {
+      timeZone: 'Asia/Singapore',
+    }) // "dd/mm/yyyy",
+    const currTime = now.toLocaleTimeString('en-GB', {
+      timeZone: 'Asia/Singapore',
+    }) // "hh:mm:ss"
 
-  if (!DEBUG) {
-    if (!isValidTimeRange(now) || !isValidDay(now)) {
-      throw new Error('Sorry, currently this service is unavailable')
+    if (!DEBUG) {
+      if (!isValidTimeRange(now) || !isValidDay(now)) {
+        throw new Error('Sorry, currently this service is unavailable')
+      }
     }
-  }
 
-  let data = await getCache(nusnet)
-  if (!data) {
-    data = {
-      name: [name],
-      attendance: [],
+    let data = await getCache(nusnet)
+    if (!data) {
+      data = {
+        name: [name],
+        attendance: [],
+      }
+    } else {
+      data = JSON.parse(data)
     }
-  } else {
-    data = JSON.parse(data)
-  }
 
-  // can only checkin once per day.
-  if (!data.attendance.find(x => x.date == currDate)) {
-    data.attendance.push({
-      date: currDate,
-      time: currTime,
-    })
-    await setCache(nusnet, JSON.stringify(data))
-    if (DEBUG) {
-      console.log(JSON.stringify(data.attendance))
+    // can only checkin once per day.
+    if (!data.attendance.find(x => x.date == currDate)) {
+      data.attendance.push({
+        date: currDate,
+        time: currTime,
+      })
+      await setCache(nusnet, JSON.stringify(data))
+      if (DEBUG) {
+        console.log(JSON.stringify(data.attendance))
+      }
     }
-  }
 
-  // Redirect to /?name=${name}
-  url.searchParams.append('name', name)
-  return new Response(null, {
-    status: 302,
-    headers: { location: url.href },
-  })
+    // Redirect to /?name=${name}
+    url.searchParams.append('name', name)
+    return redirect(url.href)
+  } catch (err) {
+    return new Response(err, { status: 500 })
+  }
 }
 
 async function listAttendance(request) {
-  const url = new URL(request.url)
-  const formData = await request.formData()
-  const pswd = escapeHtml(formData.get('pswd'))
+  try {
+    const url = new URL(request.url)
+    const formData = await request.formData()
+    const pswd = escapeHtml(formData.get('pswd'))
 
-  if (pswd !== ADMIN_PSWD) {
-    return Response.redirect(url.host) // redirect to form
-  }
+    if (pswd !== ADMIN_PSWD) {
+      return redirect(url.href)
+    }
 
-  const { keys } = await listCache()
-  const promises = []
-  for (let key of keys) {
-    promises.push(getCache(key.name))
-  }
+    const { keys } = await listCache()
+    const promises = []
+    for (let key of keys) {
+      promises.push(getCache(key.name))
+    }
 
-  const results = await Promise.allSettled(promises)
-  const data = []
-  for (let i = 0; i < results.length; i++) {
-    if (results[i].status === 'rejected') continue
-    data.push({
-      nusnet: keys[i].name,
-      ...JSON.parse(results[i].value),
+    const results = await Promise.allSettled(promises)
+    const data = []
+    for (let i = 0; i < results.length; i++) {
+      if (results[i].status === 'rejected') continue
+      data.push({
+        nusnet: keys[i].name,
+        ...JSON.parse(results[i].value),
+      })
+    }
+
+    return new Response(listTemplate(JSON.stringify(data)), {
+      headers: { 'content-type': 'text/html' },
     })
+  } catch (err) {
+    return new Response(err, { status: 500 })
   }
-
-  return new Response(listTemplate(JSON.stringify(data)), {
-    headers: { 'content-type': 'text/html' },
-  })
 }
 
 async function generateQRCode(request) {
@@ -115,11 +120,7 @@ async function handleRequest(request) {
 }
 
 addEventListener('fetch', event => {
-  try {
-    event.respondWith(handleRequest(event.request))
-  } catch (err) {
-    return new Response(err, { status: 500 })
-  }
+  event.respondWith(handleRequest(event.request))
 })
 
 /**
@@ -287,9 +288,9 @@ for (let x of data) {
  * KV functions
  */
 
-const setCache = (key, value) => ATTENDSYS.put(key, value)
-const getCache = key => ATTENDSYS.get(key)
-const listCache = () => ATTENDSYS.list()
+const setCache = (key, value) => KV.put(key, value)
+const getCache = key => KV.get(key)
+const listCache = () => KV.list()
 
 /**
  * Util functions
@@ -307,4 +308,11 @@ const isValidTimeRange = datetime => {
 const isValidDay = datetime => {
   const day = datetime.getDay()
   return day == 1 || day == 3
+}
+
+const redirect = location => {
+  return new Response(null, {
+    status: 302,
+    headers: { location },
+  })
 }

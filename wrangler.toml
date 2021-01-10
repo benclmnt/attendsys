@@ -1,17 +1,17 @@
-name = "attend"
+name = "attend-dev"
 type = "webpack"
 account_id = "85fad368ff87a470ab16c64b0197fce6"
 workers_dev = true
 webpack_config = "webpack.config.js"
 route = ""
-vars = { DEBUG = "true", ADMIN_PSWD = "alyssaangeldrakedanjeff" }
-kv_namespaces = [
-    { binding = "ATTENDSYS", preview_id = "b6db4cf577d54d9b81fced96045d48df", id = "4f137cc38255462db4fedcc4f92630f9" }
-]
-
-[env.dev]
-name = "attend-dev"
 vars = { DEBUG = "true", ADMIN_PSWD = "bc" }
 kv_namespaces = [
-    { binding = "ATTENDSYS", preview_id = "b6db4cf577d54d9b81fced96045d48df" }
+    { binding = "KV", preview_id = "b6db4cf577d54d9b81fced96045d48df", id = "b6db4cf577d54d9b81fced96045d48df" }
+]
+
+[env.prod]
+name = "attend"
+vars = { DEBUG = "true", ADMIN_PSWD = "alyssaangeldrakedanjeff" }
+kv_namespaces = [
+    { binding = "KV", id = "4f137cc38255462db4fedcc4f92630f9" }
 ]
