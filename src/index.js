@@ -53,9 +53,7 @@ async function updateAttendance(request) {
     url.searchParams.append('name', name)
     return redirect(url.href)
   } catch (err) {
-    const url = new URL(request.url)
-    url.searchParams.append('err', err)
-    return redirect(url.href)
+    return new Response(err, { status: 500 })
   }
 }
 
@@ -124,15 +122,9 @@ async function handleRequest(request) {
     })
   }
 
-  return new Response(
-    await formTemplate(
-      url.searchParams.get('name'),
-      url.searchParams.get('err'),
-    ),
-    {
-      headers: { 'content-type': 'text/html' },
-    },
-  )
+  return new Response(await formTemplate(url.searchParams.get('name')), {
+    headers: { 'content-type': 'text/html' },
+  })
 }
 
 async function handleScheduled(scheduledTime) {
@@ -144,6 +136,7 @@ addEventListener('fetch', event => {
 })
 
 addEventListener('scheduled', event => {
+  // event.waitUntil takes in a promise
   event.waitUntil(handleScheduled(event.scheduledTime))
 })
 
@@ -161,8 +154,7 @@ const template = (body, script = '') => `
     <meta name="description" content="">
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐰</text></svg>">
-    <style>
-    </style>
+    <link href="https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css" rel="stylesheet">
     <title>
         QR Code Attendance
     </title>
@@ -176,7 +168,13 @@ ${script}
 const formTemplate = async (name, err) => {
   if (name) {
     return template(
-      `Thankyou ${escapeHtml(name)} for attending!`,
+      `
+<div class="min-h-screen flex items-center justify-center bg-green-300 py-12 px-4 sm:px-6 lg:px-8">
+  <h2 class="mt-6 text-center text-xl text-gray-900">
+      Thankyou <span class="font-bold">${escapeHtml(name)}</span> for attending!
+  </h2>
+</div>
+`,
       `
 <script>
 history.pushState(null, null, "s");
@@ -190,26 +188,42 @@ window.addEventListener('popstate', function () {
 
   const secret = await getCache(UNIQUE_CODE)
   return template(`
-<h1>Angklung Check-In</h1>
-${err && `<p>${err}</p>`}
-<form method="post">
-    <label>Name</label>
-    <input type="text" name="name">
-    <label>NUSNET</label>
-    <input type="text" name="nusnet">
-    <input type="hidden" name="${UNIQUE_CODE}" value="${secret}">
-    <input type="submit">
-</form>
+<div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+  <div>
+    <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+      Angklung Check-In
+    </h2>
+  <div>
+  <form class="mt-8 space-y-6" method="post">
+    <div>
+      <label class="sr-only">Name</label>
+      <input type="text" name="name" placeholder="Full Name" required class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm">
+    </div>
+    <div>
+      <label class="sr-only">NUSNET</label>
+      <input type="text" name="nusnet" placeholder="NUSNET id" required class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm">
+    </div>
+      <input type="hidden" name="${UNIQUE_CODE}" value="${secret}">
+    <div>
+      <button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+        Check in
+      </button>
+    </div>
+  </form>
+</div>
 `)
 }
 
 const qrTemplate = cells =>
   template(
-    '',
+    `
+<div id="qr" class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+</div>
+`,
     `
 <script>
-const width = 200;
-const height = 200;
+const width = 320;
+const height = 320;
 
 const canvas = document.createElement('canvas');
 canvas.width = width;
@@ -231,7 +245,7 @@ for (let r = 0; r < cells.length ; ++r) {
         ctx.fillRect(Math.round(c*tileW), Math.round(r*tileH), w, h);
     }
 }
-document.querySelector("body").appendChild(canvas);
+document.querySelector("#qr").appendChild(canvas);
 </script>
   `,
   )
@@ -239,24 +253,49 @@ document.querySelector("body").appendChild(canvas);
 const adminTemplate = () =>
   template(
     `
-<form method="post">
-<input type="password" name="pswd"/>
-<input type="submit">
 </form>
+<div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+  <div>
+    <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+      👀
+    </h2>
+  <div>
+  <form class="mt-8 space-y-6" method="post">
+    <div>
+      <label class="sr-only">Password</label>
+      <input type="password" autocomplete="password" name="pswd" required class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm">
+    </div>
+    <div>
+      <button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+        Submit
+      </button>
+    </div>
+  </form>
+</div>
 `,
   )
 
 const listTemplate = data =>
   template(
     `
-<table>
-  <thead>
-    <th style="width: 100px;">NUSNET</th>
-    <th style="width: 150px;">Name</th>
-  </thead>
-  <tbody>
-  </tbody>
-</table>
+<div class="flex flex-col">
+  <div class="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+    <div class="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
+      <div class="shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
+        <table class="table-auto">
+          <thead class="bg-gray-50">
+            <tr>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NUSNET</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
 `,
     `
 <script>
@@ -271,12 +310,8 @@ data.map(x => x.attendance).forEach(y => {
   })
 })
 
-console.log(dates);
-
 dates.sort((a,b) => Number(a.slice(0, 2)) - Number(b.slice(0, 2)))
 dates.sort((a,b) => Number(a.slice(3)) - Number(b.slice(3)))
-
-console.log(dates);
 
 const thead = document.querySelector('table thead tr');
 for (let date of dates) {
@@ -284,24 +319,31 @@ for (let date of dates) {
   th.scope = "col"
   th.textContent = date;
   th.style.cssText = "width: 50px;"
+  th.classList.add(...("px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider".split(" ")))
   thead.appendChild(th);
 }
 
 const tbody = document.querySelector('table tbody');
 for (let x of data) {
   const tr = document.createElement('tr');
+
   const nusnet = document.createElement('td');
+  nusnet.classList.add(...("px-6 py-4 whitespace-nowrap").split(" "))
   nusnet.textContent = x.nusnet;
   tr.appendChild(nusnet);
+
   const name = document.createElement('td');
+  name.classList.add(...("px-6 py-4 whitespace-nowrap").split(" "))
   name.textContent = x.name;
   tr.appendChild(name);
+
   const attendance = new Map();
   x.attendance.forEach(y => {
     attendance.set(y.date.slice(0, 5), y.time.slice(0, 5))
   })
   dates.forEach(date => {
     const tile = document.createElement('td');
+    tile.classList.add(...("px-6 py-4 whitespace-nowrap").split(" "))
     if (attendance.has(date)) {
       tile.textContent = attendance.get(date)
     }
