@@ -30,7 +30,9 @@ async function updateAttendance(request) {
       throw new Error('Invalid attempt.')
     }
 
-    if (!(await getCache(VALID_KEY)).includes(nusnet)) {
+    const valid_keys = await getCache(VALID_KEY)
+    if (!valid_keys.includes(nusnet)) {
+      url.pathname = `/${code}` // to regain the code
       return redirect(url.href)
     }
 
@@ -102,8 +104,8 @@ async function listAttendance(request) {
 
 async function generateQRCode(request) {
   const url = new URL(request.url)
-  url.pathname = '/' + (await getCache(UNIQUE_CODE))
-  const urlWithCode = url.protocol + '//' + url.hostname + url.pathname
+  const urlWithCode =
+    url.protocol + '//' + url.hostname + '/' + (await getCache(UNIQUE_CODE))
   console.log(urlWithCode)
   const cells = qrcode(urlWithCode).modules
   return new Response(qrTemplate(cells), {
