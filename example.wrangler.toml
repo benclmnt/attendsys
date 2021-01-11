@@ -1,0 +1,16 @@
+name = "attend-dev"
+type = "webpack"
+account_id = ""
+workers_dev = true
+webpack_config = "webpack.config.js"
+vars = { DEBUG = "true", ADMIN_PSWD = "" }
+kv_namespaces = [
+    { binding = "KV", preview_id = "aaaa", id = "aaaa" }
+]
+
+[env.prod]
+name = "attend"
+vars = { DEBUG = "" ADMIN_PSWD = "" }
+kv_namespaces = [
+    { binding = "KV", id = "bbbb" }
+]
