@@ -24,10 +24,10 @@ async function updateAttendance(request) {
     const formData = await request.formData()
     const nusnet = escapeHtml(formData.get('nusnet').toUpperCase())
     const name = escapeHtml(formData.get('name'))
-    const code = escapeHtml(formData.get(UNIQUE_CODE))
+    const code = getCookie(request, 'code') || url.pathname.slice(1) // fallback for those who disabled javascript (?)
 
     if (code !== (await getCache(UNIQUE_CODE))) {
-      throw new Error('Whatcha tryna to do?!')
+      throw new Error('Invalid attempt.')
     }
 
     if (!(await getCache(VALID_KEY)).includes(nusnet)) {
@@ -58,6 +58,7 @@ async function updateAttendance(request) {
 
     // Redirect to /?name=${name}
     url.searchParams.append('name', name)
+    url.pathname = ''
     return redirect(url.href)
   } catch (err) {
     return new Response(err, { status: 500 })
@@ -101,7 +102,10 @@ async function listAttendance(request) {
 
 async function generateQRCode(request) {
   const url = new URL(request.url)
-  const cells = qrcode(url.host).modules
+  url.pathname = '/' + (await getCache(UNIQUE_CODE))
+  const urlWithCode = url.protocol + '//' + url.hostname + url.pathname
+  console.log(urlWithCode)
+  const cells = qrcode(urlWithCode).modules
   return new Response(qrTemplate(cells), {
     headers: { 'content-type': 'text/html' },
   })
@@ -117,19 +121,29 @@ async function handleRequest(request) {
   if (request.method === 'POST') {
     if (url.pathname === '/list') {
       return listAttendance(request)
+    } else if (url.pathname === '/qr') {
+      return generateQRCode(request)
     }
     return updateAttendance(request)
   }
 
-  if (url.pathname === '/qr') {
-    return generateQRCode(request)
-  } else if (url.pathname === '/list') {
-    return new Response(adminTemplate(), {
+  if (url.pathname === '/qr' || url.pathname === '/list') {
+    return new Response(loginTemplate(), {
       headers: { 'content-type': 'text/html' },
     })
   }
 
-  return new Response(await formTemplate(url.searchParams.get('name')), {
+  const name = url.searchParams.get('name')
+  if (name) {
+    return new Response(successTemplate(url.searchParams.get('name')), {
+      headers: {
+        'content-type': 'text/html',
+        'set-cookie': 'code=; Max-Age=-1',
+      }, // expires code
+    })
+  }
+
+  return new Response(formTemplate(), {
     headers: { 'content-type': 'text/html' },
   })
 }
@@ -171,29 +185,24 @@ const template = (body, script = '') => `
 ${script}
 </html>
 `
-const formTemplate = async (name, err) => {
-  if (name) {
-    return template(
-      `
+const successTemplate = name =>
+  template(
+    `
 <div class="min-h-screen flex items-center justify-center bg-green-300 py-12 px-4 sm:px-6 lg:px-8">
   <h2 class="mt-6 text-center text-xl text-gray-900">
       Thankyou <span class="font-bold">${escapeHtml(name)}</span> for attending!
   </h2>
 </div>
 `,
-      `
+    `
 <script>
-history.pushState(null, null, "s");
-window.addEventListener('popstate', function () {
-    history.pushState(null, null, "s");
-});
+window.history.pushState(null, null, "s")
 </script>
 `,
-    )
-  }
+  )
 
-  const secret = await getCache(UNIQUE_CODE)
-  return template(
+const formTemplate = () =>
+  template(
     `
 <div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
   <div>
@@ -210,9 +219,8 @@ window.addEventListener('popstate', function () {
       <label class="sr-only">NUSNET</label>
       <input type="text" id="nusnet" name="nusnet" placeholder="NUSNET id" required class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm">
     </div>
-      <input type="hidden" name="${UNIQUE_CODE}" value="${secret}">
     <div>
-      <button onclick="handleSubmit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+      <button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
         Check in
       </button>
     </div>
@@ -225,7 +233,8 @@ window.addEventListener('popstate', function () {
     document.querySelector("#name").value = window.localStorage.getItem("name");
     document.querySelector("#nusnet").value = window.localStorage.getItem("nusnet");
   }
-
+  document.cookie = "code=" + window.location.pathname.slice(1)
+  window.history.replaceState(null, null, "s");
   document.querySelector("#form").addEventListener("submit", event => {
     window.localStorage.setItem("name", document.querySelector("#name").value)
     window.localStorage.setItem("nusnet", document.querySelector("#nusnet").value)
@@ -233,7 +242,6 @@ window.addEventListener('popstate', function () {
 </script>
 `,
   )
-}
 
 const qrTemplate = cells =>
   template(
@@ -271,7 +279,7 @@ document.querySelector("#qr").appendChild(canvas);
   `,
   )
 
-const adminTemplate = () =>
+const loginTemplate = () =>
   template(
     `
 </form>
@@ -431,6 +439,23 @@ function uid() {
       .toString(16)
       .slice(4)
   )
+}
+
+function getCookie(request, name) {
+  let result = ''
+  const cookieString = request.headers.get('Cookie')
+  if (cookieString) {
+    const cookies = cookieString.split(';')
+    cookies.forEach(cookie => {
+      const cookiePair = cookie.split('=', 2)
+      const cookieName = cookiePair[0].trim()
+      if (cookieName === name) {
+        const cookieVal = cookiePair[1]
+        result = cookieVal
+      }
+    })
+  }
+  return result
 }
 
 const redirect = location => {
