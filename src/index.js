@@ -278,11 +278,14 @@ const adminTemplate = () =>
 const listTemplate = data =>
   template(
     `
+<button id="export" class="w-full py-2 px-4 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
+    Export
+</button>
 <div class="flex flex-col">
   <div class="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
     <div class="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
       <div class="shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
-        <table class="table-auto">
+        <table class="table-auto" id="table-attendance">
           <thead class="bg-gray-50">
             <tr>
               <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NUSNET</th>
@@ -351,6 +354,20 @@ for (let x of data) {
   })
   tbody.appendChild(tr);
 }
+</script>
+<script src=
+"//ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js">
+</script>
+<script src=
+"//cdn.rawgit.com/rainabba/jquery-table2excel/1.1.0/dist/jquery.table2excel.min.js">
+</script>
+<script>
+  $("#export").click(function() {
+    $("#table-attendance").table2excel({
+        name: "Angklung attendance list",
+        filename: "attendance-" + new Date().toISOString().slice(0, 10)
+    });
+  });
 </script>
 `,
   )
