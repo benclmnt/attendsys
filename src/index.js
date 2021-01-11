@@ -416,7 +416,8 @@ const listCache = () => KV.list()
  */
 
 const isValidTimeRange = datetime => {
-  const hr = datetime.getHours()
+  // Cloudflare getHours return UTC time. + 8 because we are in GMT +8 tz
+  const hr = (datetime.getHours() + 8) % 24
   const min = datetime.getMinutes()
   // 18.30 - 20.59
   if (hr < 18 || hr > 21) return false
