@@ -3,10 +3,6 @@ import qrcode from 'qr.js'
 
 async function updateAttendance(request) {
   try {
-    const url = new URL(request.url)
-    const formData = await request.formData()
-    const nusnet = escapeHtml(formData.get('nusnet').toUpperCase())
-    const name = escapeHtml(formData.get('name'))
     const now = new Date()
     const currDate = now.toLocaleDateString('en-GB', {
       timeZone: 'Asia/Singapore',
@@ -19,6 +15,16 @@ async function updateAttendance(request) {
       if (!isValidTimeRange(now) || !isValidDay(now)) {
         throw new Error('Sorry, currently this service is unavailable')
       }
+    }
+
+    const url = new URL(request.url)
+    const formData = await request.formData()
+    const nusnet = escapeHtml(formData.get('nusnet').toUpperCase())
+    const name = escapeHtml(formData.get('name'))
+    const code = escapeHtml(formData.get(UNIQUE_CODE))
+
+    if (code !== (await getCache(UNIQUE_CODE))) {
+      throw new Error('Whatcha tryna to do?!')
     }
 
     let data = await getCache(nusnet)
@@ -47,7 +53,9 @@ async function updateAttendance(request) {
     url.searchParams.append('name', name)
     return redirect(url.href)
   } catch (err) {
-    return new Response(err, { status: 500 })
+    const url = new URL(request.url)
+    url.searchParams.append('err', err)
+    return redirect(url.href)
   }
 }
 
@@ -61,7 +69,8 @@ async function listAttendance(request) {
       return redirect(url.href)
     }
 
-    const { keys } = await listCache()
+    let { keys } = await listCache()
+    keys = keys.filter(key => key.name !== UNIQUE_CODE)
     const promises = []
     for (let key of keys) {
       promises.push(getCache(key.name))
@@ -92,6 +101,7 @@ async function generateQRCode(request) {
     headers: { 'content-type': 'text/html' },
   })
 }
+
 /**
  * Respond with hello worker text
  * @param {Request} request
@@ -114,13 +124,27 @@ async function handleRequest(request) {
     })
   }
 
-  return new Response(formTemplate(url.searchParams.get('name')), {
-    headers: { 'content-type': 'text/html' },
-  })
+  return new Response(
+    await formTemplate(
+      url.searchParams.get('name'),
+      url.searchParams.get('err'),
+    ),
+    {
+      headers: { 'content-type': 'text/html' },
+    },
+  )
+}
+
+async function handleScheduled(scheduledTime) {
+  return setCache(UNIQUE_CODE, uid())
 }
 
 addEventListener('fetch', event => {
   event.respondWith(handleRequest(event.request))
+})
+
+addEventListener('scheduled', event => {
+  event.waitUntil(handleScheduled(event.scheduledTime))
 })
 
 /**
@@ -149,11 +173,11 @@ const template = (body, script = '') => `
 ${script}
 </html>
 `
-const formTemplate = name => {
-  return name
-    ? template(
-        `Thankyou ${escapeHtml(name)} for attending!`,
-        `
+const formTemplate = async (name, err) => {
+  if (name) {
+    return template(
+      `Thankyou ${escapeHtml(name)} for attending!`,
+      `
 <script>
 history.pushState(null, null, "s");
 window.addEventListener('popstate', function () {
@@ -161,14 +185,19 @@ window.addEventListener('popstate', function () {
 });
 </script>
 `,
-      )
-    : template(`
+    )
+  }
+
+  const secret = await getCache(UNIQUE_CODE)
+  return template(`
 <h1>Angklung Check-In</h1>
+${err && `<p>${err}</p>`}
 <form method="post">
     <label>Name</label>
     <input type="text" name="name">
     <label>NUSNET</label>
     <input type="text" name="nusnet">
+    <input type="hidden" name="${UNIQUE_CODE}" value="${secret}">
     <input type="submit">
 </form>
 `)
@@ -305,9 +334,23 @@ const isValidTimeRange = datetime => {
   if (min < 30) return false
 }
 
+// only monday and wednesday
 const isValidDay = datetime => {
   const day = datetime.getDay()
   return day == 1 || day == 3
+}
+
+// https://gist.github.com/gordonbrander/2230317#gistcomment-3404537
+function uid() {
+  return (
+    String.fromCharCode(Math.floor(Math.random() * 26) + 97) +
+    Math.random()
+      .toString(16)
+      .slice(2) +
+    Date.now()
+      .toString(16)
+      .slice(4)
+  )
 }
 
 const redirect = location => {
