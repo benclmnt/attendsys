@@ -2,40 +2,41 @@
 
 QR code based attendance system, similar to Singapore's Safe Entry
 
-# User Guide
+## What is this app build for?
 
-## Routes:
+This app is build for attendance tracking for a school club's weekly activities.
 
-1. QR: https://angklung.benclmnt.com/qr
-2. Admin: https://angklung.benclmnt.com/list
-3. Form: https://angklung.benclmnt.com
+## User Guide
 
-## Usage
+Important Routes:
 
-1. Just show qr page, the qr will redirect to the attendance form
-2. For admin page, enter password. You can export the data to excel file by clicking export on top
+1. QR: `/qr`
+2. Admin: `/list`
 
-# Developer Guide
+### Usage
 
-## Security
+#### Attendance taking
 
-Several precautions applied in the design of the app
+1. Admin log into QR route (`/qr`) to get the QR code that will be shown on the page
+2. Attendees can then scan the QR code and input their particulars.
+3. Upon successful submission, they would get a confirmation page with green background. Otherwise, it will just keep refreshing the form.
 
-1. Add a unique code for each event, auto updated via cron trigger.
-2. Disable form submission on non event days
-3. Password protected admin page
+#### Attendance listing
 
-## App flow
+1. Admin log into admin route (`/list`) and a table of attendance will be shown.
+2. Admin can export the data to excel file by clicking the export button on top of the page.
 
-### Login flow
+## Developer Guide
 
-1. QR page shows link to form with special token in path
-2. On visit, the token from path will be stored in cookie (key = `code`), and the browser history is replaced
-3. Upon receiving the post request to record attendance, the API will:
-   1. Check whether the time of the event matches
-   2. Check whether the code (from cookie) is valid
-4. If so, the API will record attendance and return success page, with a request to invalidate the previous code
+Read [technical guide](TECHNICAL.md) for app design.
+
+### Local Development
+
+1. Copy `example.wrangler.toml` into `wrangler.toml` and fill in `account_id`, `ADMIN_PSWD` and KV namespaces id(s).
+2. `yarn` to install dependencies
+3. `yarn start`
+4. Open `http://localhost:8787` to see your app running.
 
 ## Stack
 
-Cloudflare workers + Cloudflare KV
+The app is hosted on Cloudflare Workers, with data stored on Cloudflare KV.
