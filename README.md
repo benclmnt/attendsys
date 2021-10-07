@@ -21,10 +21,14 @@ Important Routes:
 2. Attendees can then scan the QR code and input their particulars.
 3. Upon successful submission, they would get a confirmation page with green background. Otherwise, it will just keep refreshing the form.
 
+![attend-flow](https://user-images.githubusercontent.com/49342399/136303741-130ac475-8491-4b74-b3f2-4505082ad905.png)
+
 #### Attendance listing
 
 1. Admin log into admin route (`/list`) and a table of attendance will be shown.
 2. Admin can export the data to excel file by clicking the export button on top of the page.
+
+![attend-list](https://user-images.githubusercontent.com/49342399/136303916-b5074b4a-c21f-4b10-b974-20f273a82cd4.png)
 
 ## Developer Guide
 
